@@ -1,8 +1,11 @@
 # SHELL_KENTER.md — Kenter on the Keycard Shell (agent spec)
 
 **Audience:** the agent working in this repo (`keycard-shell`, STM32H5 / FreeRTOS / C firmware).
-**Status:** implementation spec (2026-07-14). Grounded in a read of both forks —
-this firmware and the `status-keycard` applet (the Ed25519 fork).
+**Status:** implementation spec (2026-07-14, amended same day: **on-card** token
+custody §6 — an interim Shell-flash custody draft was considered and dropped).
+Grounded in a read of both forks — this firmware and the `status-keycard` applet
+(the Ed25519 fork) — plus `kenter-crypto`'s `token.rs` / `shard.rs` /
+`container.rs` for the token byte layout.
 **Goal:** make the Keycard Shell an **air-gapped Kenter signer + verifier** for
 Kenter's **spend mode**.
 
@@ -32,7 +35,8 @@ Kenter's **spend mode**.
 [`app/crypto/`](./app/crypto/) · [`app/core/core.c`](./app/core/core.c) ·
 [`app/core/core_eth.c`](./app/core/core_eth.c) ·
 [`app/keycard/keycard_cmdset.c`](./app/keycard/keycard_cmdset.c) /
-[`.h`](./app/keycard/keycard_cmdset.h) · [`app/ur/`](./app/ur/)
+[`.h`](./app/keycard/keycard_cmdset.h) (incl. token-store client, §6) ·
+[`app/ur/`](./app/ur/)
 
 **Live mint contract (testnet):**
 [`CB6QDGPL…RJAK`](https://stellar.expert/explorer/testnet/contract/CB6QDGPLL7JY76TS5PH73BYSCTGPHODA4NDDUI7VIFALRYPEJ6JLRJAK)
@@ -42,10 +46,12 @@ Kenter's **spend mode**.
 ## 0. TL;DR
 
 Make this Shell an **air-gapped Kenter signer + verifier** for **spend mode**. It
-does two jobs, both offline:
+does three jobs, all offline:
 1. **Verify** a received bearer token's structure (Ed25519 chain sigs) — no network.
 2. **Sign** ownership operations with the on-card Ed25519 **owner key**: transfer
    (`spend`) and redeem authorizations.
+3. **Store** verified token bytes **on the card** (§6) — the card is the complete
+   wallet (keys + tokens); Shell and phone stay stateless.
 
 It does **not** touch the ledger. A companion **phone** broadcasts the signed
 `spend` and runs the online gates (`get_token` polling). QR (animated UR) is the
@@ -75,7 +81,9 @@ Mapping to an **air-gapped** device:
 The Shell **cannot** verify ledger state itself (air-gapped) — that's the phone's
 job, or a signed "visual oracle" (a trusted server rendering `get_token` results as
 QR the Shell scans; ≈ a phone trusting its RPC). The Shell is a **signer**, never
-an online wallet. It stores keys, not tokens.
+an online wallet. The **card** custodies the owner keys and — per §6 — the
+verified token bytes; the Shell handles tokens only transiently in RAM and never
+talks to the ledger.
 
 ---
 
@@ -176,13 +184,15 @@ Grounded in the existing structure — follow the eth/btc patterns.
    `ETH_SIGN_REQUEST` / `CRYPTO_PSBT`):
    - **`KENTER_RECEIVE`** — derive a fresh owner key (`m/44'/148'/n'`, next `n`),
      export its pubkey, compute the commitment, **display it as a QR** for the payer
-     to spend to. Persist `n` in [`app/storage`](./app/storage/).
-   - **`KENTER_SPEND_REQUEST`** — scan a UR carrying the token bytes +
-     `new_owner_commitment` (+ which owner index is current). **Verify the token
+     to spend to. Then scan the token UR from the payer, **verify it (G1)** and
+     write it to the card (§6) tagged with `n` — nothing persists on the Shell.
+   - **`KENTER_SPEND_REQUEST`** — select a token stored on the card (§6) or scan a
+     UR carrying the token bytes; scan/enter the `new_owner_commitment`. **Verify the token
      (G1)**, show amount + recipient (clear-signing), build the spend message,
      `M = SHA-256(message)`, `keycard_cmd_sign(EDDSA, owner_path, M)`, then **emit a
      UR QR** of `{ephemeral_key, current_owner_pubkey, new_owner_commitment,
-     signature}` for the phone to submit to `mint.spend(...)`.
+     signature}` for the phone to submit to `mint.spend(...)`, followed by the
+     token bytes themselves for handover to the payee.
    - *(later)* **`KENTER_REDEEM_REQUEST`** — the redeem owner-proof, same shape.
 5. **A Kenter UR type.** Define one alongside the existing UR types in
    [`app/ur`](./app/ur/) (`ur_types.h` / registry), or wrap the payload in the
@@ -190,36 +200,123 @@ Grounded in the existing structure — follow the eth/btc patterns.
 6. **UI / clear-signing.** Before any card sign, display token value +
    recipient-commitment fingerprint on-screen (mirror the eth EIP-712 clear-sign
    UX). The user approves via keypad; nothing signs silently.
+7. **Card token-store client** (§6): once the applet fork specifies the
+   token-store APDUs, add the `keycard_cmdset` client functions (chunked
+   write/read/list/delete) and a "tokens" menu (list / show value / emit as UR /
+   delete) backed entirely by card reads.
 
 **Not needed:** Stellar tx building, SEP-0005 addresses, strkey — the Shell signs
-raw Kenter digests, never Stellar transactions.
+raw Kenter digests, never Stellar transactions. Also not needed: any Shell-side
+token persistence — tokens live on the card (§6), and the Shell's flash FS is
+untouched by the Kenter flows.
 
 ---
 
-## 6. The flows on-device (payer = Shell, payee = phone or 2nd Shell)
+## 6. On-card token storage (the card is the wallet)
+
+Token bytes live **on the card**, not the Shell. The Shell touches token bytes
+only in RAM: scan → verify → write to card on receive; read from card → emit QR
+on spend. A card moved to any Shell carries the owner keys *and* the tokens —
+the card is the complete wallet, the Shell a **stateless terminal**. This is the
+[`PIVOT.md`](https://github.com/inviti8/kenter/blob/main/PIVOT.md) §P5 direction.
+*(Decision 2026-07-14: supersedes an earlier draft that cached token bytes in
+the Shell's flash FS — the Shell persists nothing for Kenter.)*
+
+### 6.1 What storage is, and is not
+
+Storage is **byte custody, not assembly**. Every signature inside a token
+(`ChainLink.signature_a/b`, the container signature, the biscuit) was produced by
+*network node keys at print time* — re-emitting a stored token is plain
+concatenation of stored parts, no crypto involved. The card's owner key never
+participates in the token's internal structure; it only signs the spend/redeem
+authorization (§3).
+
+Consequently neither Shell nor card **can mint or assemble new tokens** from
+parts: each `ChainLink` is dual-signed by two co-located node secrets, the pair
+shard needs an ECDH between a node secret and a peer public key, and the biscuit
+is signed with the requestor's raw secret — none of which exist on the Shell or
+as card operations. Assembly is the network's print event; the card is a holder.
+
+### 6.2 Sizes (from `kenter-crypto/src/container.rs`) and card capacity
+
+The container is flat concatenation, no compression:
+
+| Component | Bytes |
+|---|---|
+| Preamble (`SYMTOKEN` magic, version, type, flags) | 12 |
+| Header (event_id, timestamp, denomination) | 41–49 |
+| Ephemeral pubkey | 32 |
+| Chain header + **`ChainLink` × n** | 4 + **290·n** |
+| Initiation proof | 34 + VRF len |
+| Biscuit | 4 + ~300–600 |
+| Caveats + container signature | ~80 |
+
+A 2-pair token is ~1.1 KB; a 20-pair token ~6.5 KB. `ChainLink` being a **fixed
+290 bytes** suits JavaCard perfectly: a preallocated slot pool (JavaCard has no
+heap reclamation) with zero fragmentation. Budgeting ~1.5 KB per token slot
+(links + a capped header/biscuit blob):
+
+- J3H145-class (144 KB, ~80–100 KB free after the applet): ~40–60 tokens
+- J3R180/J3R200-class (~169 KB usable NVM): ~60–80 tokens
+- megabyte-class (eUICC-grade silicon; sourcing under research → status-keycard
+  `docs/CARD_SOURCING.md`): hundreds
+
+### 6.3 Card interface — specified in the applet fork first
+
+A token store means **new APDUs (chunked write/read, list, delete), which are
+defined in the `status-keycard` fork, never invented firmware-side** — the
+firmware client follows the applet spec once it lands. Constraints that applet
+spec must respect:
+
+- **Short APDUs only** (applet and this firmware's `APDU_BUF_LEN` are both
+  255-byte class): ~223 usable bytes per APDU through the secure channel, so a
+  290-byte link spans 2 APDUs and a 2-pair token ≈ 6 APDUs each way (~1 s) —
+  acceptable at spend/receive rates.
+- **Per-token record** in the slot pool: `event_id(32)` + owner index `n(4)` +
+  `status(1)` + links + capped container-header blob. The record carries `n`, so
+  the Shell persists **nothing** — [`app/storage`](./app/storage/) is not used
+  by the Kenter flows.
+- PIN-gate reads/writes like the existing key operations; token bytes are not
+  secret (inert without the owner key), so no additional protection class is
+  needed beyond the secure channel.
+
+### 6.4 Security & wear
+
+Token bytes without the owner key are inert in spend mode (the on-ledger owner
+pointer gates redemption), so on-card storage adds no theft surface beyond what
+the card + PIN already gate — and it removes the lost-Shell failure mode: keys
+recover from the seed, and the bytes travel with the card. SE NVM endurance
+(≥100K cycles) is a non-issue at token rates.
+
+---
+
+## 7. The flows on-device (payer = Shell, payee = phone or 2nd Shell)
 
 ```
 RECEIVE (payee side)              SPEND (payer = Shell)
 ────────────────────             ─────────────────────
-scan/none                         scan UR: token bytes + payee commitment
-derive owner key m/…/n'           G1: verify token offline (ed25519)  ← Shell
-export pubkey → commitment        show amount + payee fingerprint, PIN
-show commitment QR  ───────────►  M = SHA256("spend:auth"||ek||cur||new)
-persist n                         card signHash(owner_key, M) → sig
+derive owner key m/…/n'           read token from card (§6) or scan token UR
+export pubkey → commitment        scan payee commitment QR
+show commitment QR  ───────────►  G1: verify token offline (ed25519)  ← Shell
+scan token UR  ◄───────────────  show amount + payee fingerprint, PIN
+G1: verify token offline          M = SHA256("spend:auth"||ek||cur||new)
+write token + n to card (§6)      card signHash(owner_key, M) → sig
                                   emit UR QR: {ek, owner_pub, new_commit, sig}
+                                  erase/mark token spent on card (§6)
                                           │
                                           ▼
                                   phone submits mint.spend(...) ; polls get_token
                                   (G2 Active + G3 owner==payee) → payee "paid"
 ```
 
-The Shell's responsibility ends at emitting the signed-spend QR. **G2/G3 are the
+The Shell's responsibility ends at emitting the signed-spend QR (and handing the
+token bytes to the payee). **G2/G3 are the
 online side's** (phone or visual oracle) — see
 [`SPEND_MODE.md`](https://github.com/inviti8/kenter/blob/main/SPEND_MODE.md) §4 gates.
 
 ---
 
-## 7. Verification & test plan
+## 8. Verification & test plan
 
 - **Cross-verify the card signature** against `ed25519-dalek` and the mint: a
   card-produced `(pubkey, sig)` over `M` must (a) verify with `ed25519-dalek`, and
@@ -236,15 +333,24 @@ online side's** (phone or visual oracle) — see
   replaces the software owner key with the card.
 - **Determinism:** `Ed25519.signHash` is deterministic (no on-card RNG); a fixed
   `(seed, M)` must always give the same `sig` — assert it.
+- **Token store round-trip (§6):** write a token to the card, power-cycle both
+  devices, read it back and re-emit as UR; byte-compare against the original
+  container, and `deserialize_bearer_token` + `verify_chain_integrity` must
+  accept the re-emitted bytes. Also exercise chunk boundaries (a link split
+  across two APDUs) and a full slot pool.
 
 ---
 
-## 8. Open inputs / decisions (for the Kenter maintainer)
+## 9. Open inputs / decisions (for the Kenter maintainer)
 
 1. **Approve the 32-byte-digest change (§3.1)** in the kenter repo (spend.rs +
    contract + redeploy). Prerequisite for the card to be the owner signer.
 2. **UR type**: dedicated `kenter-*` UR type vs. the generic `bytes` UR — record it
-   in the applet/firmware registry.
+   in the applet/firmware registry. *Note:* the firmware's UR registry is a
+   16-slot perfect hash ([`app/ur/ur.c`](./app/ur/ur.c)) with 3 free slots;
+   `kenter-spend-request`, `kenter-spend-signature`, and `kenter-request` have
+   been verified to land on the free slots (5, 2, 10) without aliasing — a
+   dedicated type costs nothing if those names are used.
 3. **Owner-key index management**: monotonic `n` per receipt is simplest; decide
    whether to also support a reusable "static receive address" (async payments,
    trades unlinkability for reach — [`PIVOT.md`](https://github.com/inviti8/kenter/blob/main/PIVOT.md) §P5).
@@ -252,3 +358,7 @@ online side's** (phone or visual oracle) — see
    only the *spend* (payer). Same card operation; sequencing is UX.
 5. **Visual oracle** (optional, later): signed-attestation QR format for air-gapped
    payee verification — a follow-up doc.
+6. **Card token store (§6)**: the applet-side APDU spec (chunked write/read,
+   list, delete) must be defined in the `status-keycard` fork **before** the
+   firmware client — plus slot-pool sizing per card class (see status-keycard
+   `docs/CARD_SOURCING.md`), and erase-on-spend vs. keep-marked-spent.
