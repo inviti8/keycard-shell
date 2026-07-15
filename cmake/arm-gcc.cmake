@@ -22,13 +22,19 @@ if(NOT EXISTS "${ARM_TOOLCHAIN_DIR}")
 endif()
 
 # Find the ARM GCC toolchain executables
-set(CMAKE_C_COMPILER "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-gcc")
-set(CMAKE_ASM_COMPILER "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-gcc")
-set(CMAKE_LINKER "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-gcc")
-set(CMAKE_OBJCOPY "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-objcopy")
-set(CMAKE_AR "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-ar")
-set(CMAKE_OBJDUMP "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-objdump")
-set(CMAKE_SIZE_UTIL "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-size")
+if(CMAKE_HOST_WIN32)
+    set(TOOL_SUFFIX ".exe")
+else()
+    set(TOOL_SUFFIX "")
+endif()
+
+set(CMAKE_C_COMPILER "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-gcc${TOOL_SUFFIX}")
+set(CMAKE_ASM_COMPILER "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-gcc${TOOL_SUFFIX}")
+set(CMAKE_LINKER "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-gcc${TOOL_SUFFIX}")
+set(CMAKE_OBJCOPY "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-objcopy${TOOL_SUFFIX}")
+set(CMAKE_AR "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-ar${TOOL_SUFFIX}")
+set(CMAKE_OBJDUMP "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-objdump${TOOL_SUFFIX}")
+set(CMAKE_SIZE_UTIL "${ARM_TOOLCHAIN_DIR}/bin/arm-none-eabi-size${TOOL_SUFFIX}")
 
 # Verify the compilers exist
 if(NOT EXISTS "${CMAKE_C_COMPILER}")
