@@ -160,6 +160,14 @@ set(APP_SOURCES
     app/crypto/crc32.c
     app/crypto/ecdsa.c
     app/crypto/ecdsa_soft.c
+    app/crypto/ed25519-donna/curve25519-donna-32bit.c
+    app/crypto/ed25519-donna/curve25519-donna-helpers.c
+    app/crypto/ed25519-donna/curve25519-donna-scalarmult-base.c
+    app/crypto/ed25519-donna/ed25519-donna-32bit-tables.c
+    app/crypto/ed25519-donna/ed25519-donna-basepoint-table.c
+    app/crypto/ed25519-donna/ed25519-donna-impl-base.c
+    app/crypto/ed25519-donna/ed25519.c
+    app/crypto/ed25519-donna/modm-donna-32bit.c
     app/crypto/hmac.c
     app/crypto/hkdf.c
     app/crypto/memzero.c

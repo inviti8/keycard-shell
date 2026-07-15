@@ -48,4 +48,10 @@
 #define USE_KECCAK 1
 #endif
 
+// ed25519: use the smaller scalarmult path instead of the
+// precomputed base-point table (~24KB of flash)
+#ifndef OPTIMIZE_SIZE_ED25519
+#define OPTIMIZE_SIZE_ED25519 1
+#endif
+
 #endif

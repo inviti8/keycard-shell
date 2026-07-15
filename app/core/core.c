@@ -99,6 +99,28 @@ app_err_t core_export_key(keycard_t* kc, uint8_t* path, uint16_t len, uint8_t* o
   return ERR_OK;
 }
 
+app_err_t core_export_key_ed25519(keycard_t* kc, uint8_t* path, uint16_t len, uint8_t* out_pub) {
+  if ((keycard_cmd_export_key(kc, 3, path, len) != ERR_OK) || (APDU_SW(&kc->apdu) != 0x9000)) {
+    return ERR_CRYPTO;
+  }
+
+  uint8_t* data = APDU_RESP(&kc->apdu);
+
+  uint16_t tag;
+  uint16_t off = tlv_read_tag(data, &tag);
+  if (tag != 0xa1) {
+    return ERR_DATA;
+  }
+
+  off += tlv_read_length(&data[off], &len);
+
+  if (tlv_read_fixed_primitive(0x80, KEYCARD_ED25519_PUB_LEN, &data[off], out_pub) == TLV_INVALID) {
+    return ERR_DATA;
+  }
+
+  return ERR_OK;
+}
+
 app_err_t core_get_fingerprint(uint8_t* path, size_t len, uint32_t* fingerprint) {
   if (len == 0 && g_core.master_fingerprint != 0) {
     *fingerprint = g_core.master_fingerprint;

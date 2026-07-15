@@ -18,6 +18,7 @@
 #include "crypto/bip39.h"
 #include "crypto/slip39.h"
 #include "crypto/secp256k1.h"
+#include "crypto/ed25519-donna/ed25519.h"
 #include "storage/keys.h"
 
 #define KEYCARD_AID_LEN 9
@@ -654,6 +655,35 @@ app_err_t keycard_read_signature(uint8_t* data, uint8_t* digest, uint8_t* out_si
   }
 
   return ERR_DATA;
+}
+
+app_err_t keycard_read_signature_ed25519(uint8_t* data, const uint8_t* digest, uint8_t* out_pub, uint8_t* out_sig) {
+  uint16_t len;
+  uint16_t tag;
+  uint16_t off = tlv_read_tag(data, &tag);
+
+  if (tag != 0xa0) {
+    return ERR_DATA;
+  }
+
+  off += tlv_read_length(&data[off], &len);
+
+  len = tlv_read_fixed_primitive(0x80, KEYCARD_ED25519_PUB_LEN, &data[off], out_pub);
+  if (len == TLV_INVALID) {
+    return ERR_DATA;
+  }
+  off += len;
+
+  if (tlv_read_fixed_primitive(0x88, KEYCARD_ED25519_SIG_LEN, &data[off], out_sig) == TLV_INVALID) {
+    return ERR_DATA;
+  }
+
+  // the card signs the 32-byte digest as the Ed25519 message
+  if (ed25519_sign_open(digest, SHA256_DIGEST_LENGTH, out_pub, out_sig)) {
+    return ERR_CRYPTO;
+  }
+
+  return ERR_OK;
 }
 
 app_err_t keycard_set_name(keycard_t* kc, const char* name) {

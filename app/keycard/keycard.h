@@ -11,6 +11,9 @@
 #define KEYCARD_PAIRING_PASS_MAX_LEN 32
 #define KEYCARD_BIP39_PASS_MAX_LEN 255
 
+#define KEYCARD_ED25519_PUB_LEN 32
+#define KEYCARD_ED25519_SIG_LEN 64
+
 typedef struct {
   smartcard_t sc;
   secure_channel_t ch;
@@ -25,6 +28,7 @@ void keycard_out(keycard_t* kc);
 
 app_err_t keycard_factoryreset(keycard_t* kc);
 app_err_t keycard_read_signature(uint8_t* data, uint8_t* digest, uint8_t* out_sig);
+app_err_t keycard_read_signature_ed25519(uint8_t* data, const uint8_t* digest, uint8_t* out_pub, uint8_t* out_sig);
 app_err_t keycard_set_name(keycard_t* kc, const char* name);
 void keycard_pairing_password_hash(uint8_t* pass, uint8_t len, uint8_t pairing[32]);
 

@@ -12,7 +12,7 @@ typedef enum {
 
 typedef enum {
   KEYCARD_SIGN_ECDSA_SECP256K1 = 0,
-  KEYCARD_SIGN_EDDSA_ED25519, /* unsupported */
+  KEYCARD_SIGN_EDDSA_ED25519,
   KEYCARD_SIGN_BLS12_381, /* unsupported */
   KEYCARD_SIGN_BIP340_SCHNORR
 } keycard_sign_algo_t;
