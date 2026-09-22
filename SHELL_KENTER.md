@@ -126,7 +126,14 @@ that crate's test vectors.
 - **Redeem authorization message:**
   `"hvym_v1:spend:redeem" || ephemeral_key_32 || owner_commitment_32`.
 
-### 3.1 REQUIRED Kenter-side change: sign a 32-byte digest
+### 3.1 Kenter-side change: sign a 32-byte digest — **DONE (2026-09-22)**
+
+> **Adopted and shipped.** `kenter-crypto` signs the digest
+> (`spend_auth_digest` / `redeem_owner_digest`), the mint verifies over it, and
+> the testnet mint was redeployed to
+> `CCJJS2B6PGJAX2HDIKBRQE3TR427I6HVT57ETUAOBNFHA7EHQYNQUYKC`. The firmware can
+> now rely on `signHash(owner_secret, M)` being the owner signature the contract
+> accepts. See the kenter repo's `SPEND_MODE.md` §6.
 
 The card's `signHash` takes a **32-byte** message. The Kenter messages above are
 84–114 bytes, so they cannot be fed to the card directly. Resolution (a Kenter-side
@@ -143,8 +150,8 @@ verify_redeem_owner}` hash the message with SHA-256 before sign/verify; the mint
 `spend` + `enforce_owner` `ed25519_verify` over `sha256(message)`; update the
 contract test helpers; redeploy. (The *ephemeral*-key redeem signature — Path A's
 `domain_tag || ephemeral_key` — is unaffected; that's the composed key, signed by
-the combiner in software, not the card.) **This is an open decision for the Kenter
-maintainer — coordinate before the card path relies on it.**
+the combiner in software, not the card.) **All of this is done** — the digest is
+live on testnet, so the card path can depend on it.
 
 The Shell only ever sees `M` (32 bytes) — it never needs the message layout beyond
 building it to hash. Keep the layout identical to `spend.rs`.
@@ -343,8 +350,9 @@ online side's** (phone or visual oracle) — see
 
 ## 9. Open inputs / decisions (for the Kenter maintainer)
 
-1. **Approve the 32-byte-digest change (§3.1)** in the kenter repo (spend.rs +
-   contract + redeploy). Prerequisite for the card to be the owner signer.
+1. ~~**Approve the 32-byte-digest change (§3.1)**~~ — **DONE 2026-09-22.** Shipped
+   in the kenter repo (spend.rs + contract + testnet redeploy to `CCJJS2B6…UYKC`).
+   The card can now be the owner signer.
 2. **UR type**: dedicated `kenter-*` UR type vs. the generic `bytes` UR — record it
    in the applet/firmware registry. *Note:* the firmware's UR registry is a
    16-slot perfect hash ([`app/ur/ur.c`](./app/ur/ur.c)) with 3 free slots;
