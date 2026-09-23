@@ -359,9 +359,15 @@ online side's** (phone or visual oracle) — see
    `kenter-spend-request`, `kenter-spend-signature`, and `kenter-request` have
    been verified to land on the free slots (5, 2, 10) without aliasing — a
    dedicated type costs nothing if those names are used.
-3. **Owner-key index management**: monotonic `n` per receipt is simplest; decide
-   whether to also support a reusable "static receive address" (async payments,
-   trades unlinkability for reach — [`PIVOT.md`](https://github.com/inviti8/kenter/blob/main/PIVOT.md) §P5).
+3. ~~**Owner-key index management**~~ — **DECIDED 2026-09-23**, see
+   [`OWNER_KEYS.md`](https://github.com/inviti8/kenter/blob/main/OWNER_KEYS.md).
+   Monotonic `n` per receipt, never reused (gaps are harmless); **index 0 is
+   reserved** as an opt-in reusable "static receive address" for async payments,
+   labelled as linkable since everything sent to it correlates. The software
+   wallet now mirrors the card: same seed, same `m/44'/148'/n'` SLIP-0010 ed25519
+   path, and the derivation index is what ties an owner key to a token — so a
+   card and a software wallet derive identical keys and can take over each
+   other's tokens.
 4. **Redeem on-Shell**: whether the Shell signs the *redeem* owner-proof (payee) or
    only the *spend* (payer). Same card operation; sequencing is UX.
 5. **Visual oracle** (optional, later): signed-attestation QR format for air-gapped
