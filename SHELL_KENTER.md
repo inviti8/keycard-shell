@@ -38,8 +38,14 @@ Kenter's **spend mode**.
 [`.h`](./app/keycard/keycard_cmdset.h) (incl. token-store client, §6) ·
 [`app/ur/`](./app/ur/)
 
-**Live mint contract (testnet):**
-[`CB6QDGPL…RJAK`](https://stellar.expert/explorer/testnet/contract/CB6QDGPLL7JY76TS5PH73BYSCTGPHODA4NDDUI7VIFALRYPEJ6JLRJAK)
+**Live mint contract (testnet), as of 2026-10-22:**
+[`CDROVACS…PKPGC`](https://stellar.expert/explorer/testnet/contract/CDROVACSFWYDFG4WJFM7UPUQESLUGHSDL2IL4DRA3XTRRQQ4SYPPKPGC)
+— the USDC mint deployed 2026-10-20, the first with redeem-to-an-address.
+Earlier mints named in this file (`CB6QDGPL…RJAK`, `CCJJS2B6…UYKC`) are
+superseded and take a **different redeem signature**, so a client built for one
+cannot redeem against the other. Kenter's
+[`docs/TESTNET.md`](https://github.com/inviti8/kenter/blob/main/docs/TESTNET.md)
+is the current list; check it rather than this line.
 
 ---
 
@@ -114,8 +120,21 @@ talks to the ledger.
 
 All bytes must match
 [`kenter-crypto/src/spend.rs`](https://github.com/inviti8/kenter/blob/main/crates/kenter-crypto/src/spend.rs)
-and the mint contract, or signatures won't verify on-chain. Cross-check against
-that crate's test vectors.
+and the mint contract, or signatures won't verify on-chain.
+
+**Check against the generated vectors, not against this prose.** Kenter commits
+[`tests/vectors/spend_vectors.json`](https://github.com/inviti8/kenter/blob/main/tests/vectors/spend_vectors.json),
+generated from `kenter-crypto` itself: domain tags, the owner-commitment hash,
+and for each of `spend_auth` and `redeem_owner` the full signable bytes, the
+SHA-256 digest, and a reference Ed25519 signature with its secret. Ed25519 is
+deterministic, so this firmware can check its **signer** against them and not
+only its byte layout.
+
+That file exists because this section was wrong for two days and nothing
+failed: the redeem message gained a `recipient` field upstream on 2026-10-20
+and the prose here still described the old one. Kenter's
+`crates/kenter-crypto/tests/spend_vectors.rs` now fails on any layout change
+and names this repo as a consumer to update.
 
 - **Owner commitment:** `commitment = SHA-256("hvym_v1:spend:owner" || owner_pubkey_32)`.
   The Shell exports the Ed25519 owner pubkey from the card, computes this, and the
@@ -124,19 +143,27 @@ that crate's test vectors.
 - **Spend authorization message:**
   `"hvym_v1:spend:auth" || ephemeral_key_32 || current_commitment_32 || new_owner_commitment_32`.
 - **Redeem authorization message:**
-  `"hvym_v1:spend:redeem" || ephemeral_key_32 || owner_commitment_32`.
+  `"hvym_v1:spend:redeem" || ephemeral_key_32 || owner_commitment_32 || recipient_xdr`.
+  **The recipient is part of the signed message** (added upstream 2026-10-20 with
+  redeem-to-an-address, `REDEEM.md` §5.1) and it is **variable length** — the XDR
+  of a Stellar account id, 36 bytes for an ed25519 account. Without it a proof
+  would authorise "redeem this note" rather than "pay this note's escrow to
+  *this* address", so anyone holding a valid proof could redirect the payout.
+  This spec described the old two-field layout until 2026-10-22; a signer built
+  to that description produces signatures the current mint rejects.
 
 ### 3.1 Kenter-side change: sign a 32-byte digest — **DONE (2026-09-22)**
 
 > **Adopted and shipped.** `kenter-crypto` signs the digest
 > (`spend_auth_digest` / `redeem_owner_digest`), the mint verifies over it, and
-> the testnet mint was redeployed to
-> `CCJJS2B6PGJAX2HDIKBRQE3TR427I6HVT57ETUAOBNFHA7EHQYNQUYKC`. The firmware can
-> now rely on `signHash(owner_secret, M)` being the owner signature the contract
-> accepts. See the kenter repo's `SPEND_MODE.md` §6.
+> the testnet mint was redeployed — at the time to
+> `CCJJS2B6…UYKC`, since superseded twice; the current one is at the top of this
+> file. The firmware can now rely on `signHash(owner_secret, M)` being the owner
+> signature the contract accepts. See the kenter repo's `SPEND_MODE.md` §6.
 
 The card's `signHash` takes a **32-byte** message. The Kenter messages above are
-84–114 bytes, so they cannot be fed to the card directly. Resolution (a Kenter-side
+114 bytes for a spend and 84 + `len(recipient_xdr)` for a redeem — 120 bytes for
+an ordinary account — so they cannot be fed to the card directly. Resolution (a Kenter-side
 change, pre-mainnet, cheap):
 
 > **Owner authorizations sign `M = SHA-256(message)` (32 bytes), not the raw
