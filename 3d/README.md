@@ -44,15 +44,18 @@ Blender/STL coordinates in mm, origin at the screen centre, +Y towards the scree
 - Panel top surface Z = 5.4. Original keys: 10.0 mm square, top at Z = 6.2, with about 0.25 mm gap per side to the opening.
 - Plunger tip: bottom at Z = 0.4. The air pocket around it (about 3 mm wide, up to Z = 1.1 in the original) is what lets the key travel.
 
-## Status (checked 2026-11-04)
+## Status (second check, 2026-11-04)
 
 Draft: **not ready to order.**
 
-- [ ] Key-to-opening gap: 0.07-0.08 mm per side (keys 10.42, openings 10.57). Open the holes to about 10.9 mm.
-- [ ] Keypad: the air pocket around each plunger is mostly filled (about 0.2 mm wide at Z = 0.9, closed above Z = 1.0). Re-check after the plunger rework.
-- [ ] Top panel: about 200 open edges along the left long side at Z ≈ 4 (edge roundover). Run 3D Print Toolbox → Make Manifold.
-- [ ] Locating dot on the "5" key was removed: decide whether to keep it.
-- [ ] Key legends (planned): recessed 0.3-0.5 mm, stroke at least 0.4-0.5 mm, characters 5-6 mm tall.
+- [x] All 12 keys and openings centred on the grid (within 0.01 mm).
+- [x] Legends recessed 0.36 mm; arrows on 2/4/6/8 raised 0.31 mm (top Z = 6.44).
+- [x] Square plungers clear the switch bodies; only the tip touches the actuator.
+- [ ] Key-to-opening gap: 0.11 mm per side (keys 10.42, openings 10.64). Aim for 0.2-0.25 mm (openings 10.8-10.9).
+- [ ] The "5" nub is recessed (pit 0.36 mm deep, Ø ≈ 2.8 mm), not raised. Union it instead of subtracting it if it should stand proud.
+- [ ] Space under the keys: the key body's bottom edge is at Z ≈ 0.36 (originally ≈ 0.72) above the board. Check it against the switch travel.
+- [ ] Plunger tip at Z = 0.38 against the switch actuator top at 0.42: 0.04 mm preload (originally 0.02). Raising it to about Z = 0.42 is safer.
+- [ ] Mesh: the top panel has about 200 open edges and the keypad about 30 non-manifold edges near Z ≈ 1.1-1.3. Run 3D Print Toolbox → Make Manifold on both.
 
 ## Exporting STL from Blender
 
