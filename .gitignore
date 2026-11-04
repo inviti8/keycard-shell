@@ -13,3 +13,8 @@ uv.lock
 .mypy_cache
 # ARM GCC Toolchain (auto-downloaded)
 toolchain/
+# PCBWay order files (quotes, BOMs, fab packages)
+pcbway/
+
+# Blender automatic backups
+*.blend1
