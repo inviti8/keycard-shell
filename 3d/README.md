@@ -44,18 +44,18 @@ Blender/STL coordinates in mm, origin at the screen centre, +Y towards the scree
 - Panel top surface Z = 5.4. Original keys: 10.0 mm square, top at Z = 6.2, with about 0.25 mm gap per side to the opening.
 - Plunger tip: bottom at Z = 0.4. The air pocket around it (about 3 mm wide, up to Z = 1.1 in the original) is what lets the key travel.
 
-## Status (second check, 2026-11-04)
+## Status (fourth check, 2026-11-04)
 
-Draft: **not ready to order.**
+**Ready for a resin (SLA) test print**, once the mesh is repaired (last item). Not yet for metal.
 
 - [x] All 12 keys and openings centred on the grid (within 0.01 mm).
-- [x] Legends recessed 0.36 mm; arrows on 2/4/6/8 raised 0.31 mm (top Z = 6.44).
-- [x] Square plungers clear the switch bodies; only the tip touches the actuator.
-- [ ] Key-to-opening gap: 0.11 mm per side (keys 10.42, openings 10.64). Aim for 0.2-0.25 mm (openings 10.8-10.9).
-- [ ] The "5" nub is recessed (pit 0.36 mm deep, Ø ≈ 2.8 mm), not raised. Union it instead of subtracting it if it should stand proud.
-- [ ] Space under the keys: the key body's bottom edge is at Z ≈ 0.36 (originally ≈ 0.72) above the board. Check it against the switch travel.
-- [ ] Plunger tip at Z = 0.38 against the switch actuator top at 0.42: 0.04 mm preload (originally 0.02). Raising it to about Z = 0.42 is safer.
-- [ ] Mesh: the top panel has about 200 open edges and the keypad about 30 non-manifold edges near Z ≈ 1.1-1.3. Run 3D Print Toolbox → Make Manifold on both.
+- [x] Key-to-opening gap: **0.205 mm per side** minimum, corners included (keys 10.42, openings 10.83). Fine for resin.
+- [x] Legends recessed 0.36 mm; arrows on 2/4/6/8 raised 0.31 mm (top Z = 6.44-6.49).
+- [x] "5" locator is a recessed dimple (0.36 mm deep, Ø ≈ 2.8 mm). Kept on purpose; structurally fine.
+- [x] Plunger tips flush with the switch actuators: tip bottom Z = 0.43, actuator top 0.42, no preload. Plungers clear the switch bodies.
+- [ ] Space under the keys: the key body's bottom edge is at Z ≈ 0.37 (originally ≈ 0.72) above the board. Verify on the test print that every key actuates before bottoming out.
+- [ ] Mesh: the top panel has 135 open edges; the keypad has 28 non-manifold edges near Z ≈ 1.1-1.3. Run 3D Print Toolbox → Make Manifold on both (or let the print shop repair).
+- [ ] For metal: openings about 10.95 mm (gap 0.25-0.3 mm), drawn at final size rather than inflated with a modifier. Ask the shop to finish the holes. Also check snap fits, wall thickness ≥ 1 mm, and insulation against the board.
 
 ## Exporting STL from Blender
 
